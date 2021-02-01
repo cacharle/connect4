@@ -309,12 +309,12 @@ mod tests {
 
     #[test]
     fn test_from_str() {
-        let p = Position::from("012");
+        let p = Position::from("123");
         assert_eq!(p.at(0, 0), Cell::OtherPlayer,   "\n{:?}", p);
         assert_eq!(p.at(0, 1), Cell::CurrentPlayer, "\n{:?}", p);
         assert_eq!(p.at(0, 2), Cell::OtherPlayer,   "\n{:?}", p);
 
-        let p = Position::from("000");
+        let p = Position::from("111");
         assert_eq!(p.at(0, 0), Cell::OtherPlayer,   "\n{:?}", p);
         assert_eq!(p.at(1, 0), Cell::CurrentPlayer, "\n{:?}", p);
         assert_eq!(p.at(2, 0), Cell::OtherPlayer,   "\n{:?}", p);
@@ -325,7 +325,7 @@ mod tests {
     }
 }
 
-fn solve(p: Position) -> i32 {
+fn solve(p: Position, a: i32, b: i32) -> i32 {
     if p.is_draw() {
         return 0;
     }
@@ -334,17 +334,35 @@ fn solve(p: Position) -> i32 {
             return (((WIDTH * HEIGHT + 1) as i32) - (p.play_count as i32)) / 2;
         }
     }
-    let mut best = -((WIDTH * HEIGHT) as i32);
+
+    let mut alpha = a;
+    let mut beta = b;
+
+    let max = (((WIDTH * HEIGHT + 1) as i32) - (p.play_count as i32)) / 2;
+
+    if beta > max {
+        beta = max;
+        if (alpha >= beta) {
+            return beta;
+        }
+    }
+
     for x in 0..WIDTH {
         if !p.is_valid_play(x) {
             continue
         }
-        let score = -solve(p.play(x));
-        if score > best {
-            best = score;
+
+        let score = -solve(p.play(x), -beta, -alpha);
+
+        if (score >= beta) {
+            return score;
+        }
+
+        if score > alpha {
+            alpha = score;
         }
     }
-    return best;
+    return alpha;
 }
 
 fn main() {
@@ -354,5 +372,5 @@ fn main() {
     // p = p.play(1);
     // p = p.play(5);
     // println!("{:?}", p);
-    println!("{}", solve(p.clone()));
+    println!("{}", solve(p.clone(), -10000, 100000));
 }
