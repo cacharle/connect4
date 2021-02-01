@@ -2,8 +2,6 @@ const HEIGHT:      u64 = 6;
 const WIDTH:       u64 = 7;
 const FULL_HEIGHT: u64 = HEIGHT + 1;
 
-type Bits = u64;
-
 #[derive(Debug, Eq, PartialEq)]
 enum Cell {
     Empty,
@@ -39,14 +37,6 @@ struct Position {
 impl Position {
     fn new() -> Position {
         Position{ player: 0, mask: 0 }
-    }
-
-    fn from_position(col_moves: &[u64]) -> Position {
-        let mut position = Position::new();
-        for col_pos in col_moves {
-            position = position.play(*col_pos);
-        }
-        position
     }
 
     fn play(&self, col_pos: u64) -> Position {
@@ -129,6 +119,28 @@ impl Position {
             return Cell::CurrentPlayer;
         }
         return Cell::OtherPlayer;
+    }
+}
+
+impl From<&[u64]> for Position {
+    fn from(plays: &[u64]) -> Self {
+        let mut position = Position::new();
+        for col_pos in plays {
+            position = position.play(*col_pos);
+        }
+        position
+    }
+}
+
+impl From<&str> for Position {
+    fn from(s: &str) -> Self {
+        let it = s.chars().map(|c| c.to_digit(10).unwrap() as u64);
+        if it.clone().any(|x| x >= WIDTH) {
+            panic!("bad position string format \"{}\"", s);
+        }
+        Position::from(
+            &it.collect::<Vec<u64>>()[..]
+        )
     }
 }
 
@@ -269,6 +281,36 @@ mod tests {
         p = assert_not_winning_play(p, 5); // w
         p = assert_not_winning_play(p, 3);
         assert!(p.is_winning_play(3), "\n{:?}", p);  // anti diagonal
+    }
+
+    #[test]
+    fn test_from_slice() {
+        let p = Position::from(&[0, 1, 2][..]);
+        assert_eq!(p.at(0, 0), Cell::OtherPlayer,   "\n{:?}", p);
+        assert_eq!(p.at(0, 1), Cell::CurrentPlayer, "\n{:?}", p);
+        assert_eq!(p.at(0, 2), Cell::OtherPlayer,   "\n{:?}", p);
+
+        let p = Position::from(&[0, 0, 0][..]);
+        assert_eq!(p.at(0, 0), Cell::OtherPlayer,   "\n{:?}", p);
+        assert_eq!(p.at(1, 0), Cell::CurrentPlayer, "\n{:?}", p);
+        assert_eq!(p.at(2, 0), Cell::OtherPlayer,   "\n{:?}", p);
+    }
+
+    #[test]
+    fn test_from_str() {
+        let p = Position::from("012");
+        assert_eq!(p.at(0, 0), Cell::OtherPlayer,   "\n{:?}", p);
+        assert_eq!(p.at(0, 1), Cell::CurrentPlayer, "\n{:?}", p);
+        assert_eq!(p.at(0, 2), Cell::OtherPlayer,   "\n{:?}", p);
+
+        let p = Position::from("000");
+        assert_eq!(p.at(0, 0), Cell::OtherPlayer,   "\n{:?}", p);
+        assert_eq!(p.at(1, 0), Cell::CurrentPlayer, "\n{:?}", p);
+        assert_eq!(p.at(2, 0), Cell::OtherPlayer,   "\n{:?}", p);
+
+        assert!(std::panic::catch_unwind(|| Position::from("a")).is_err());
+        assert!(std::panic::catch_unwind(|| Position::from("7")).is_err());
+        assert!(std::panic::catch_unwind(|| Position::from("00 0")).is_err());
     }
 }
 
