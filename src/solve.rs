@@ -1,6 +1,12 @@
+use std::collections::HashMap;
+
 use crate::position::{Position, WIDTH, HEIGHT};
 
-pub fn solve(p: Position, a: i32, b: i32) -> i32 {
+
+pub fn solve(p: Position, a: i32, b: i32, cache: &mut HashMap<u64, i32>) -> i32 {
+    if let Some(score) = cache.get(&p.key()) {
+        return *score;
+    }
     if p.is_draw() {
         return 0;
     }
@@ -27,7 +33,7 @@ pub fn solve(p: Position, a: i32, b: i32) -> i32 {
             continue
         }
 
-        let score = -solve(p.play(x), -beta, -alpha);
+        let score = -solve(p.play(x), -beta, -alpha, cache);
 
         if score >= beta {
             return score;
@@ -37,6 +43,7 @@ pub fn solve(p: Position, a: i32, b: i32) -> i32 {
             alpha = score;
         }
     }
+    cache.insert(p.key(), alpha);
     return alpha;
 }
 
