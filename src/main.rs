@@ -30,19 +30,21 @@ struct Position {
     /// stones of the current player
     player: u64,
     /// stones of the grid
-    mask:   u64,
+    mask: u64,
+    pub play_count: u64,
 }
 
 // https://github.com/PascalPons/connect4/blob/master/Position.hpp
 impl Position {
     fn new() -> Position {
-        Position{ player: 0, mask: 0 }
+        Position{ player: 0, mask: 0, play_count: 0 }
     }
 
     fn play(&self, col_pos: u64) -> Position {
         Position {
-            player: self.player ^ self.mask,
-            mask:   self.mask | self.mask + Position::bottom_mask(col_pos),
+            player:     self.player ^ self.mask,
+            mask:       self.mask | self.mask + Position::bottom_mask(col_pos),
+            play_count: self.play_count + 1,
         }
     }
 
@@ -93,6 +95,10 @@ impl Position {
         false
     }
 
+    fn is_draw(&self) -> bool {
+        return self.play_count == WIDTH * HEIGHT;
+    }
+
     fn key(&self) -> u64 {
         self.player + self.mask
     }
@@ -134,7 +140,7 @@ impl From<&[u64]> for Position {
 
 impl From<&str> for Position {
     fn from(s: &str) -> Self {
-        let it = s.chars().map(|c| c.to_digit(10).unwrap() as u64);
+        let it = s.chars().map(|c| c.to_digit(10).unwrap() as u64 - 1);
         if it.clone().any(|x| x >= WIDTH) {
             panic!("bad position string format \"{}\"", s);
         }
@@ -149,6 +155,7 @@ use std::fmt;
 impl fmt::Debug for Position {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         use Cell::*;
+        write!(f, "play_count: {}\n", self.play_count)?;
         write!(f, "{:10}{:10}{:10}\n", "position", "mask", "player")?;
         for y in (0..FULL_HEIGHT).rev() {
             for x in 0..WIDTH {
@@ -284,6 +291,10 @@ mod tests {
     }
 
     #[test]
+    fn test_is_draw() {
+    }
+
+    #[test]
     fn test_from_slice() {
         let p = Position::from(&[0, 1, 2][..]);
         assert_eq!(p.at(0, 0), Cell::OtherPlayer,   "\n{:?}", p);
@@ -314,11 +325,34 @@ mod tests {
     }
 }
 
+fn solve(p: Position) -> i32 {
+    if p.is_draw() {
+        return 0;
+    }
+    for x in 0..WIDTH {
+        if p.is_valid_play(x) && p.is_winning_play(x) {
+            return (((WIDTH * HEIGHT + 1) as i32) - (p.play_count as i32)) / 2;
+        }
+    }
+    let mut best = -((WIDTH * HEIGHT) as i32);
+    for x in 0..WIDTH {
+        if !p.is_valid_play(x) {
+            continue
+        }
+        let score = -solve(p.play(x));
+        if score > best {
+            best = score;
+        }
+    }
+    return best;
+}
+
 fn main() {
-    let mut p = Position::new();
-    p = p.play(2);
-    p = p.play(2);
-    p = p.play(1);
-    p = p.play(5);
-    println!("{:?}", p);
+    let mut p = Position::from("7422341735647741166133573473242566");
+    // p = p.play(2);
+    // p = p.play(2);
+    // p = p.play(1);
+    // p = p.play(5);
+    // println!("{:?}", p);
+    println!("{}", solve(p.clone()));
 }
