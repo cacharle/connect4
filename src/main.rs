@@ -3,15 +3,17 @@ use std::io::prelude::*;
 use std::time::{Instant,Duration};
 
 pub mod position;
-pub mod solve;
+pub mod solver;
 
 use position::Position;
-use solve::{solve, solve_weak};
+use solver::Solver;
 
 
 fn main() {
     let mut total_time = Duration::new(0, 0);
     let mut total_solve = 0;
+    let mut total_visited = 0;
+    let mut solver = Solver::new();
 
     for result in  io::stdin().lock().lines() {
         let line = result.unwrap();
@@ -31,19 +33,21 @@ fn main() {
             Ok(pos) => {
                 print!("{:?}", pos);
                 let begin = Instant::now();
-                let score = solve(pos);
+                let score = solver.solve(pos);
                 let elapsed = begin.elapsed();
-                println!("{:03}: score: {:3}, time: {:?}\n", total_solve, score, elapsed);
-                // if score != expected_score {
-                //     eprintln!("{:03}: score: {:3} {:3}", total_solve, score, expected_score);
-                // }
-                // assert_eq!(score, expected_score);
+                println!("{:03}: score: {:3}, time: {:?}, visited {}\n", total_solve, score, elapsed, solver.visited);
+                if score != expected_score {
+                    eprintln!("{:03}: score: {:3} {:3}", total_solve, score, expected_score);
+                }
+                assert_eq!(score, expected_score);
                 total_time += elapsed;
                 total_solve += 1;
+                total_visited += solver.visited;
+                solver.reset();
             }
             Err(msg) =>
                 eprintln!("wrong score format {:?}: {}", fields[1], msg),
         }
     }
-    println!("mean time {:?}", total_time / total_solve);
+    println!("mean time: {:?} | mean visited {}", total_time / total_solve, total_visited / total_solve as usize);
 }
