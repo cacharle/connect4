@@ -156,8 +156,8 @@ use std::fmt;
 impl fmt::Debug for Position {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         use Cell::*;
-        write!(f, "play_count: {}\n", self.play_count)?;
-        write!(f, "{:10}{:10}{:10}\n", "position", "mask", "player")?;
+        writeln!(f, "play_count: {}", self.play_count)?;
+        writeln!(f, "{:10}{:10}{:10}", "position", "mask", "player")?;
         for y in (0..FULL_HEIGHT).rev() {
             for x in 0..WIDTH {
                 match self.at(y, x) {

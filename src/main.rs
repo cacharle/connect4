@@ -1,6 +1,6 @@
 use std::io;
 use std::io::prelude::*;
-use std::collections::HashMap;
+use std::time::{Instant,Duration};
 
 pub mod position;
 pub mod solve;
@@ -10,6 +10,9 @@ use solve::solve;
 
 
 fn main() {
+    let mut total_time = Duration::new(0, 0);
+    let mut total_solve = 0;
+
     for result in  io::stdin().lock().lines() {
         let line = result.unwrap();
         let fields: Vec<&str> = line.split_ascii_whitespace().collect();
@@ -26,20 +29,17 @@ fn main() {
         };
         match fields[0].parse::<Position>() {
             Ok(pos) => {
-                // println!("{:?}", pos);
-                let mut cache = HashMap::with_capacity(30000);
-                println!("score: {:3} {:3}", solve(pos, -10000, 10000, &mut cache), expected_score);
+                print!("{:?}", pos);
+                let begin = Instant::now();
+                let score = solve(pos);
+                let elapsed = begin.elapsed();
+                total_time += elapsed;
+                total_solve += 1;
+                println!("score: {:3} {:3}, time: {:?}\n", score, expected_score, elapsed);
             }
             Err(msg) =>
                 eprintln!("wrong score format {:?}: {}", fields[1], msg),
         }
     }
-
-    // let mut p = "7422341735647741166133573473242566".parse::<Position>().unwrap();
-    // p = p.play(2);
-    // p = p.play(2);
-    // p = p.play(1);
-    // p = p.play(5);
-    // println!("{:?}", p);
-    // println!("{}", solve(p.clone(), -10000, 100000));
+    println!("mean time {:?}", total_time / total_solve);
 }
