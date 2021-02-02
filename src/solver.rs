@@ -1,29 +1,42 @@
-use std::collections::HashMap;
+use fnv::FnvHashMap;  // better hashing function performance on small key (e.g u64)
 
 use crate::position::{Position, WIDTH, HEIGHT, MIN_SCORE};
 
 
 const COLUMNS_ORDER: [u64; 7] = [3, 2, 4, 1, 5, 0, 6];
 
-type Cache = HashMap<u64, i32>;
+type Cache = FnvHashMap<u64, i32>;
 
 pub struct Solver {
     pub visited: usize,
     pub cache: Cache,
 }
 
-const CACHE_SIZE: usize = 1 << 20 + 1;
+const CACHE_SIZE: usize = 1 << 10 + 1;
 
 impl Solver {
     pub fn new() -> Solver {
         Solver {
             visited: 0,
-            cache: Cache::with_capacity(CACHE_SIZE),
+            cache: Cache::with_capacity_and_hasher(CACHE_SIZE, Default::default()),
         }
     }
 
     pub fn solve(&mut self, p: Position) -> i32 {
-        self.solve_rec(p, -1000, 1000)
+        let mut min = -((WIDTH * HEIGHT - p.play_count) as i32) / 2;
+        let mut max = ((WIDTH * HEIGHT + 1 - p.play_count)) as i32 / 2;
+
+        while min < max {
+            let mut mid = min + (max - min) / 2;
+
+            if      mid <= 0 && min / 2 < mid { mid = min / 2; } // ?? (improve x2 but why?)
+            else if mid >= 0 && max / 2 > mid { mid = max / 2; } // ??
+
+            let score = self.solve_rec(p.clone(), mid, mid + 1);
+            if score > mid { min = score; }
+            else           { max = score; }
+        }
+        return min;
     }
 
     // the weak solver only tells if the position is a win/lose/draw
