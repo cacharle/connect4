@@ -1,6 +1,7 @@
 pub const HEIGHT:      u64 = 6;
 pub const WIDTH:       u64 = 7;
 pub const FULL_HEIGHT: u64 = HEIGHT + 1;
+pub const MIN_SCORE: i32 = -((WIDTH * HEIGHT) as i32) / 2 + 3;
 
 #[derive(Debug, Eq, PartialEq)]
 enum Cell {
@@ -157,27 +158,27 @@ impl fmt::Debug for Position {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         use Cell::*;
         writeln!(f, "play_count: {}", self.play_count)?;
-        writeln!(f, "{:10}{:10}{:10}", "position", "mask", "player")?;
+        writeln!(f, "{:16}{:16}{:16}", "position", "mask", "player")?;
         for y in (0..FULL_HEIGHT).rev() {
             for x in 0..WIDTH {
                 match self.at(y, x) {
-                    Empty         => write!(f, ".")?,
-                    CurrentPlayer => write!(f, "x")?,
-                    OtherPlayer   => write!(f, "o")?,
+                    Empty         => write!(f, ". ")?,
+                    CurrentPlayer => write!(f, "x ")?,
+                    OtherPlayer   => write!(f, "o ")?,
                 }
             }
             write!(f, "  ")?;
             for x in 0..WIDTH {
                 match self.at(y, x) {
-                    Empty                       => write!(f, ".")?,
-                    CurrentPlayer | OtherPlayer => write!(f, "#")?,
+                    Empty                       => write!(f, ". ")?,
+                    CurrentPlayer | OtherPlayer => write!(f, "# ")?,
                 }
             }
             write!(f, "  ")?;
             for x in 0..WIDTH {
                 match self.at(y, x) {
-                    Empty | OtherPlayer => write!(f, ".")?,
-                    CurrentPlayer       => write!(f, "#")?,
+                    Empty | OtherPlayer => write!(f, ". ")?,
+                    CurrentPlayer       => write!(f, "# ")?,
                 }
             }
             write!(f, "\n")?;

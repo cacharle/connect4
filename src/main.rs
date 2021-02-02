@@ -6,7 +6,7 @@ pub mod position;
 pub mod solve;
 
 use position::Position;
-use solve::solve;
+use solve::{solve, solve_weak};
 
 
 fn main() {
@@ -33,9 +33,13 @@ fn main() {
                 let begin = Instant::now();
                 let score = solve(pos);
                 let elapsed = begin.elapsed();
+                println!("{:03}: score: {:3}, time: {:?}\n", total_solve, score, elapsed);
+                // if score != expected_score {
+                //     eprintln!("{:03}: score: {:3} {:3}", total_solve, score, expected_score);
+                // }
+                // assert_eq!(score, expected_score);
                 total_time += elapsed;
                 total_solve += 1;
-                println!("score: {:3} {:3}, time: {:?}\n", score, expected_score, elapsed);
             }
             Err(msg) =>
                 eprintln!("wrong score format {:?}: {}", fields[1], msg),
