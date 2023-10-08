@@ -1,6 +1,7 @@
+use std::error::Error;
 use std::io;
 use std::io::prelude::*;
-use std::time::{Instant,Duration};
+use std::time::{Duration, Instant};
 
 pub mod position;
 pub mod solver;
@@ -8,46 +9,45 @@ pub mod solver;
 use position::Position;
 use solver::Solver;
 
-
-fn main() {
+fn main() -> Result<(), Box<dyn Error>> {
     let mut total_time = Duration::new(0, 0);
     let mut total_solve = 0;
     let mut total_visited = 0;
     let mut solver = Solver::new();
 
-    for result in  io::stdin().lock().lines() {
-        let line = result.unwrap();
+    for result in io::stdin().lock().lines() {
+        let line = result?;
         let fields: Vec<&str> = line.split_ascii_whitespace().collect();
         if fields.len() != 2 {
             eprintln!("wrong line format {:?}", line);
-            continue
+            continue;
         }
-        let expected_score = match fields[1].parse::<i32>() {
-            Ok(n) => n,
-            Err(msg) => {
-                eprintln!("wrong score format {:?}: {}", fields[1], msg);
-                continue;
-            }
-        };
-        match fields[0].parse::<Position>() {
-            Ok(pos) => {
-                print!("{:?}", pos);
-                let begin = Instant::now();
-                let score = solver.solve(pos);
-                let elapsed = begin.elapsed();
-                println!("{:03}: score: {:3}, time: {:?}, visited {}\n", total_solve, score, elapsed, solver.visited);
-                if score != expected_score {
-                    eprintln!("{:03}: score: {:3} {:3}", total_solve, score, expected_score);
-                }
-                assert_eq!(score, expected_score);
-                total_time += elapsed;
-                total_solve += 1;
-                total_visited += solver.visited;
-                solver.reset();
-            }
-            Err(msg) =>
-                eprintln!("wrong score format {:?}: {}", fields[1], msg),
+        let expected_score = fields[1].parse::<i32>()?;
+        let pos = fields[0].parse::<Position>()?;
+        // print!("{:?}", pos);
+        let begin = Instant::now();
+        let score = solver.solve(pos);
+        let elapsed = begin.elapsed();
+        println!(
+            "{:03}: score: {:3}, time: {:>8.2?}, visited {:>5}",
+            total_solve, score, elapsed, solver.visited
+        );
+        if score != expected_score {
+            eprintln!(
+                "{:03}: score: {:3} {:3}",
+                total_solve, score, expected_score
+            );
         }
+        assert_eq!(score, expected_score);
+        total_time += elapsed;
+        total_solve += 1;
+        total_visited += solver.visited;
+        solver.reset();
     }
-    println!("mean time: {:?} | mean visited {}", total_time / total_solve, total_visited / total_solve as usize);
+    println!(
+        "mean time: {:?} | mean visited {}",
+        total_time / total_solve,
+        total_visited / total_solve as usize
+    );
+    Ok(())
 }
