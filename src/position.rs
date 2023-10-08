@@ -29,11 +29,14 @@ enum Cell {
 #[derive(Clone)]
 pub struct Position {
     /// stones of the current player
-    player: u64,
+    pub player: u64,
     /// stones of the grid
     mask: u64,
     pub play_count: u64,
 }
+
+const FULL_BOTTOM_MASK: u64 = 0b1000000100000010000001000000100000010000001;
+const FULL_BOARD_MASK: u64 = 0b111111011111101111110111111011111101111110111111;
 
 // https://github.com/PascalPons/connect4/blob/master/Position.hpp
 impl Position {
@@ -48,13 +51,13 @@ impl Position {
     pub fn play(&self, col_pos: u64) -> Position {
         Position {
             player: self.player ^ self.mask,
-            mask: self.mask | self.mask + Position::bottom_mask(col_pos),
+            mask: self.mask | self.mask + Self::bottom_mask(col_pos),
             play_count: self.play_count + 1,
         }
     }
 
     pub fn is_valid_play(&self, col_pos: u64) -> bool {
-        self.mask & Position::top_mask(col_pos) == 0
+        self.mask & Self::top_mask(col_pos) == 0
     }
 
     pub fn is_winning_play(&self, col_pos: u64) -> bool {
@@ -63,7 +66,7 @@ impl Position {
         // & column_mask: only modify the current player stone
         // (ignoring other player in other columns)
         let p = self.player
-            | ((self.mask + Position::bottom_mask(col_pos)) & Position::column_mask(col_pos));
+            | ((self.mask + Self::bottom_mask(col_pos)) & Self::column_mask(col_pos));
 
         // shift the board in different direction,
         // if the shifed boards have at least 1 stone in common
@@ -101,6 +104,62 @@ impl Position {
         false
     }
 
+    pub fn possible_non_losing_play_mask(&self) -> u64 {
+        let mut possible_mask = self.possible();
+        let opponent_win_mask = self.opponent_winning_position();
+        let forced_moves = possible_mask & opponent_win_mask;
+        if forced_moves != 0 {
+            if (forced_moves & (forced_moves - 1)) != 0 {
+                return 0;
+            } else {
+                possible_mask = forced_moves;
+            }
+        }
+        return possible_mask & !(opponent_win_mask >> 1);
+    }
+
+    fn opponent_winning_position(&self) -> u64 {
+        return Self::compute_winning_position(self.player ^ self.mask, self.mask);
+    }
+
+    fn possible(&self) -> u64 {
+        return (self.mask + FULL_BOTTOM_MASK) & FULL_BOARD_MASK;
+    }
+
+    // TODO: refactor to understand
+    // I think this is just the is_winning_play function but with 3 fold instead of 4 to get
+    // possible win and not wins
+    fn compute_winning_position(position: u64, mask: u64) -> u64 {
+        // vertical
+        let mut r = (position << 1) & (position << 2) & (position << 3);
+
+        //horizontal
+        let mut p = (position << (HEIGHT + 1)) & (position << 2 * (HEIGHT + 1));
+        r |= p & (position << 3 * (HEIGHT + 1));
+        r |= p & (position >> (HEIGHT + 1));
+        p >>= 3 * (HEIGHT + 1);
+        r |= p & (position << (HEIGHT + 1));
+        r |= p & (position >> 3 * (HEIGHT + 1));
+
+        //diagonal 1
+        p = (position << HEIGHT) & (position << 2 * HEIGHT);
+        r |= p & (position << 3 * HEIGHT);
+        r |= p & (position >> HEIGHT);
+        p >>= 3 * HEIGHT;
+        r |= p & (position << HEIGHT);
+        r |= p & (position >> 3 * HEIGHT);
+
+        //diagonal 2
+        p = (position << (HEIGHT + 2)) & (position << 2 * (HEIGHT + 2));
+        r |= p & (position << 3 * (HEIGHT + 2));
+        r |= p & (position >> (HEIGHT + 2));
+        p >>= 3 * (HEIGHT + 2);
+        r |= p & (position << (HEIGHT + 2));
+        r |= p & (position >> 3 * (HEIGHT + 2));
+
+        return r & (FULL_BOARD_MASK ^ mask);
+    }
+
     pub fn is_draw(&self) -> bool {
         return self.play_count == WIDTH * HEIGHT;
     }
@@ -117,9 +176,8 @@ impl Position {
         Position::bottom_mask(col_pos) << (HEIGHT - 1)
     }
 
-    fn column_mask(col_pos: u64) -> u64 {
+    pub fn column_mask(col_pos: u64) -> u64 {
         0b1111111 << (col_pos * FULL_HEIGHT)
-        // ((1 << HEIGHT) - 1) << (col_pos * FULL_HEIGHT)
     }
 
     fn at(&self, y: u64, x: u64) -> Cell {
@@ -195,6 +253,15 @@ impl fmt::Debug for Position {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_mask_constants() {
+        let expected_full_bottom_mask =  (0..7).fold(0, |acc, x| acc | Position::bottom_mask(x));
+        assert_eq!(FULL_BOTTOM_MASK, expected_full_bottom_mask, "\n{:b} != \n{:b}", FULL_BOTTOM_MASK, expected_full_bottom_mask);
+
+        let expected_full_board_mask =  (0..6).fold(0, |acc, x| acc | expected_full_bottom_mask << x);
+        assert_eq!(FULL_BOARD_MASK, expected_full_board_mask, "\n{:b} != \n{:b}", FULL_BOARD_MASK, expected_full_board_mask);
+    }
 
     #[test]
     fn test_new() {

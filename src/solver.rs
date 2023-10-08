@@ -82,8 +82,7 @@ impl Solver {
             let mut mid = min + (max - min) / 2;
             if mid <= 0 && min / 2 < mid {
                 mid = min / 2;
-            }
-            else if mid >= 0 && max / 2 > mid {
+            } else if mid >= 0 && max / 2 > mid {
                 mid = max / 2;
             }
             // Check if actual score is greater or lower than mid
@@ -129,13 +128,16 @@ impl Solver {
             }
         }
 
+        let non_losing_play_mask = p.possible_non_losing_play_mask();
         let mut best = alpha;
-        for &x in COLUMNS_ORDER.iter()
-            .filter(|&&x| p.is_valid_play(x))
-        {
+        for &x in COLUMNS_ORDER.iter().filter(|&&x| p.is_valid_play(x)) {
+            let played = p.play(x);
+            // if Position::column_mask(x) & non_losing_play_mask == 0 {
+            //     continue;
+            // }
             // using negamax, variante of minimax where:
             // max(player1, player2) == -min(-player1, -player2)
-            let score = -self.solve_rec(p.play(x), -beta, -alpha);
+            let score = -self.solve_rec(played, -beta, -alpha);
             if score > best {
                 best = score;
                 // reduce alpha-beta range if found better score
