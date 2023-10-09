@@ -123,8 +123,7 @@ impl Position {
         let forced_moves = possible_mask & opponent_win_mask;
         if forced_moves != 0 {
             // check if there is at least 2 forced play
-            // if forced_moves.count_ones() > 1 {
-            if forced_moves & (forced_moves - 1) != 0 {
+            if forced_moves.count_ones() > 1 {
                 return 0;
             } else {
                 possible_mask = forced_moves; // force to play a forcing move
@@ -173,6 +172,10 @@ impl Position {
         r |= p & (self.player >> 3 * (HEIGHT + 2));
 
         r & (FULL_BOARD_MASK ^ self.mask) // remove all set bit that are not pieces
+    }
+
+    pub fn score(&self) -> u64 {
+        self.winning_mask().count_ones() as u64
     }
 
     pub fn is_draw(&self) -> bool {
