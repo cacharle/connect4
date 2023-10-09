@@ -11,7 +11,8 @@ pub struct Solver {
     cache: Cache,
 }
 
-const CACHE_SIZE: usize = 64 * 1000;
+const CACHE_SIZE: usize = 100_000_000;
+
 // struct Cache(Vec<(u64, i32)>);
 //
 // impl Cache {
@@ -105,14 +106,21 @@ impl Solver {
 
     fn solve_rec(&mut self, p: Position, mut alpha: i32, mut beta: i32) -> i32 {
         self.visited += 1;
+
+        let non_losing_play_mask = p.possible_non_losing_play_mask();
+        if non_losing_play_mask == 0 {
+            // not width*height [+ 1] because it's one less move
+            return -(((WIDTH * HEIGHT) as i32) - (p.play_count as i32)) / 2;
+        }
+
         if p.is_draw() {
             return 0;
         }
-        for x in 0..WIDTH {
-            if p.is_valid_play(x) && p.is_winning_play(x) {
-                return (((WIDTH * HEIGHT + 1) as i32) - (p.play_count as i32)) / 2;
-            }
-        }
+        // for x in 0..WIDTH {
+        //     if p.is_valid_play(x) && p.is_winning_play(x) {
+        //         return (((WIDTH * HEIGHT + 1) as i32) - (p.play_count as i32)) / 2;
+        //     }
+        // }
 
         // let max_score = self.cache.get(p.key());
         // if max_score != 0 {
@@ -128,13 +136,15 @@ impl Solver {
             }
         }
 
-        let non_losing_play_mask = p.possible_non_losing_play_mask();
         let mut best = alpha;
         for &x in COLUMNS_ORDER.iter().filter(|&&x| p.is_valid_play(x)) {
             let played = p.play(x);
-            // if Position::column_mask(x) & non_losing_play_mask == 0 {
-            //     continue;
-            // }
+            // println!("\n> {:064b}", non_losing_play_mask);
+            // println!("! {:064b}", played.player);
+            if Position::column_mask(x) & non_losing_play_mask == 0 {
+                // println!("!!!!!!!!!!");
+                continue;
+            }
             // using negamax, variante of minimax where:
             // max(player1, player2) == -min(-player1, -player2)
             let score = -self.solve_rec(played, -beta, -alpha);

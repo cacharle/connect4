@@ -31,7 +31,7 @@ pub struct Position {
     /// stones of the current player
     pub player: u64,
     /// stones of the grid
-    mask: u64,
+    pub mask: u64,
     pub play_count: u64,
 }
 
@@ -49,11 +49,16 @@ impl Position {
     }
 
     pub fn play(&self, col_pos: u64) -> Position {
-        Position {
-            player: self.player ^ self.mask,
-            mask: self.mask | self.mask + Self::bottom_mask(col_pos),
-            play_count: self.play_count + 1,
-        }
+        let mut p = self.opponent();
+        p.mask = p.mask | p.mask + Self::bottom_mask(col_pos);
+        p.play_count += 1;
+        p
+    }
+
+    fn opponent(&self) -> Position {
+        let mut p = self.clone();
+        p.player = self.player ^ self.mask;
+        p
     }
 
     pub fn is_valid_play(&self, col_pos: u64) -> bool {
@@ -65,8 +70,8 @@ impl Position {
         // mask + bottom_mask = add a stone in column
         // & column_mask: only modify the current player stone
         // (ignoring other player in other columns)
-        let p = self.player
-            | ((self.mask + Self::bottom_mask(col_pos)) & Self::column_mask(col_pos));
+        let p =
+            self.player | ((self.mask + Self::bottom_mask(col_pos)) & Self::column_mask(col_pos));
 
         // shift the board in different direction,
         // if the shifed boards have at least 1 stone in common
@@ -105,63 +110,74 @@ impl Position {
     }
 
     pub fn possible_non_losing_play_mask(&self) -> u64 {
-        let mut possible_mask = self.possible();
-        let opponent_win_mask = self.opponent_winning_position();
+        // + operator from a bitwise perspective is a << and a |
+        // (not really but kinda in this case)
+        // . . . . . . .
+        // . # # . . . .
+        // becomes
+        // . # # . . . .
+        // # . . # # # #
+        let mut possible_mask = (self.mask + FULL_BOTTOM_MASK) & FULL_BOARD_MASK;
+        let opponent_win_mask = self.opponent().winning_mask();
+        // we HAVE to play where the opponent has a winning play
         let forced_moves = possible_mask & opponent_win_mask;
         if forced_moves != 0 {
-            if (forced_moves & (forced_moves - 1)) != 0 {
+            // check if there is at least 2 forced play
+            // if forced_moves.count_ones() > 1 {
+            if forced_moves & (forced_moves - 1) != 0 {
                 return 0;
             } else {
-                possible_mask = forced_moves;
+                possible_mask = forced_moves; // force to play a forcing move
             }
         }
+        // Remove moves that are directly bellow an opponent winning space
         return possible_mask & !(opponent_win_mask >> 1);
     }
 
-    fn opponent_winning_position(&self) -> u64 {
-        return Self::compute_winning_position(self.player ^ self.mask, self.mask);
-    }
-
-    fn possible(&self) -> u64 {
-        return (self.mask + FULL_BOTTOM_MASK) & FULL_BOARD_MASK;
-    }
-
-    // TODO: refactor to understand
-    // I think this is just the is_winning_play function but with 3 fold instead of 4 to get
-    // possible win and not wins
-    fn compute_winning_position(position: u64, mask: u64) -> u64 {
+    // Mask of direct winning moves in this position
+    // This doesn't take into account enemy pieces so you may need several play to win
+    // e.g: Here # need 2 play to win
+    // # . # #
+    // x . x x
+    // # x # x
+    fn winning_mask(&self) -> u64 {
+        // move player mask 3 times up and & it to keep only the top one
         // vertical
-        let mut r = (position << 1) & (position << 2) & (position << 3);
+        let mut r = (self.player << 1) & (self.player << 2) & (self.player << 3);
 
         //horizontal
-        let mut p = (position << (HEIGHT + 1)) & (position << 2 * (HEIGHT + 1));
-        r |= p & (position << 3 * (HEIGHT + 1));
-        r |= p & (position >> (HEIGHT + 1));
-        p >>= 3 * (HEIGHT + 1);
-        r |= p & (position << (HEIGHT + 1));
-        r |= p & (position >> 3 * (HEIGHT + 1));
+        // & horizontal pairs
+        let mut p = (self.player << FULL_HEIGHT) & (self.player << (2 * FULL_HEIGHT));
+        // & with one to the right
+        r |= p & (self.player << (3 * FULL_HEIGHT));
+        // & with one to the left
+        r |= p & (self.player >> FULL_HEIGHT);
+        p >>= 3 * FULL_HEIGHT; // for the other half of the board since we shifted out part of it?
+        r |= p & (self.player << FULL_HEIGHT);
+        r |= p & (self.player >> (3 * FULL_HEIGHT));
 
         //diagonal 1
-        p = (position << HEIGHT) & (position << 2 * HEIGHT);
-        r |= p & (position << 3 * HEIGHT);
-        r |= p & (position >> HEIGHT);
+        p = (self.player << HEIGHT) & (self.player << 2 * HEIGHT);
+        r |= p & (self.player << 3 * HEIGHT);
+        r |= p & (self.player >> HEIGHT);
         p >>= 3 * HEIGHT;
-        r |= p & (position << HEIGHT);
-        r |= p & (position >> 3 * HEIGHT);
+        r |= p & (self.player << HEIGHT);
+        r |= p & (self.player >> 3 * HEIGHT);
 
         //diagonal 2
-        p = (position << (HEIGHT + 2)) & (position << 2 * (HEIGHT + 2));
-        r |= p & (position << 3 * (HEIGHT + 2));
-        r |= p & (position >> (HEIGHT + 2));
+        p = (self.player << (HEIGHT + 2)) & (self.player << 2 * (HEIGHT + 2));
+        r |= p & (self.player << 3 * (HEIGHT + 2));
+        r |= p & (self.player >> (HEIGHT + 2));
         p >>= 3 * (HEIGHT + 2);
-        r |= p & (position << (HEIGHT + 2));
-        r |= p & (position >> 3 * (HEIGHT + 2));
+        r |= p & (self.player << (HEIGHT + 2));
+        r |= p & (self.player >> 3 * (HEIGHT + 2));
 
-        return r & (FULL_BOARD_MASK ^ mask);
+        r & (FULL_BOARD_MASK ^ self.mask) // remove all set bit that are not pieces
     }
 
     pub fn is_draw(&self) -> bool {
-        return self.play_count == WIDTH * HEIGHT;
+        return self.play_count >= WIDTH * HEIGHT - 2; // -2 because we're never actually finishing
+                                                      // (maybe)
     }
 
     pub fn key(&self) -> u64 {
@@ -256,11 +272,20 @@ mod tests {
 
     #[test]
     fn test_mask_constants() {
-        let expected_full_bottom_mask =  (0..7).fold(0, |acc, x| acc | Position::bottom_mask(x));
-        assert_eq!(FULL_BOTTOM_MASK, expected_full_bottom_mask, "\n{:b} != \n{:b}", FULL_BOTTOM_MASK, expected_full_bottom_mask);
+        let expected_full_bottom_mask = (0..7).fold(0, |acc, x| acc | Position::bottom_mask(x));
+        assert_eq!(
+            FULL_BOTTOM_MASK, expected_full_bottom_mask,
+            "\n{:b} != \n{:b}",
+            FULL_BOTTOM_MASK, expected_full_bottom_mask
+        );
 
-        let expected_full_board_mask =  (0..6).fold(0, |acc, x| acc | expected_full_bottom_mask << x);
-        assert_eq!(FULL_BOARD_MASK, expected_full_board_mask, "\n{:b} != \n{:b}", FULL_BOARD_MASK, expected_full_board_mask);
+        let expected_full_board_mask =
+            (0..6).fold(0, |acc, x| acc | expected_full_bottom_mask << x);
+        assert_eq!(
+            FULL_BOARD_MASK, expected_full_board_mask,
+            "\n{:b} != \n{:b}",
+            FULL_BOARD_MASK, expected_full_board_mask
+        );
     }
 
     #[test]
@@ -368,6 +393,36 @@ mod tests {
     fn test_is_draw() {}
 
     #[test]
+    fn test_winning_mask() {
+        assert_eq!(Position::new().winning_mask(), 0);
+        // .  .  .  .  .  .  .
+        // 5 12 19 26 33 40 47
+        // 4 11 18 25 32 39 46
+        // 3 10 17 24 31 38 45
+        // r  y 16 23 30 37 44
+        // r  y 15 22 29 36 43
+        // r  y 14 21 28 35 42
+        let expected_vertical_mask = 0b1000;
+        let vertical_win = Position::from_str("121212").unwrap();
+        assert_ne!(vertical_win.winning_mask(), 0);
+        assert_eq!(vertical_win.winning_mask(), expected_vertical_mask);
+        // .  .  .  .  .  .  .
+        // 5 12 19 26 33 40 47
+        // 4 11 18 25 32 39 46
+        // 3 10 17 24 31 38 45
+        // y  9 16 23 30 37 44
+        // y  8 15 22 29 36 43
+        // y  7 r  r  r  35 42
+        let expected_horizontal_mask = 0b100000000000000000000000000010000000;
+        let horizontal_win = Position::from_str("413151").unwrap();
+        assert_ne!(horizontal_win.winning_mask(), 0);
+        assert_eq!(horizontal_win.winning_mask(), expected_horizontal_mask);
+
+        // let dia = Position::from_str("413151").unwrap();
+        // assert_ne!(horizontal_win.winning_mask(), 0);
+    }
+
+    #[test]
     fn test_from_slice() {
         let p = Position::from(&[0, 1, 2][..]);
         assert_eq!(p.at(0, 0), Cell::OtherPlayer, "\n{:?}", p);
@@ -382,18 +437,18 @@ mod tests {
 
     #[test]
     fn test_from_str() {
-        // let p = Position::from("123");
-        // assert_eq!(p.at(0, 0), Cell::OtherPlayer,   "\n{:?}", p);
-        // assert_eq!(p.at(0, 1), Cell::CurrentPlayer, "\n{:?}", p);
-        // assert_eq!(p.at(0, 2), Cell::OtherPlayer,   "\n{:?}", p);
-        //
-        // let p = Position::from("111");
-        // assert_eq!(p.at(0, 0), Cell::OtherPlayer,   "\n{:?}", p);
-        // assert_eq!(p.at(1, 0), Cell::CurrentPlayer, "\n{:?}", p);
-        // assert_eq!(p.at(2, 0), Cell::OtherPlayer,   "\n{:?}", p);
-        //
-        // assert!(std::panic::catch_unwind(|| Position::from("a")).is_err());
-        // assert!(std::panic::catch_unwind(|| Position::from("7")).is_err());
-        // assert!(std::panic::catch_unwind(|| Position::from("00 0")).is_err());
+        let p = Position::from_str("123").unwrap();
+        assert_eq!(p.at(0, 0), Cell::OtherPlayer, "\n{:?}", p);
+        assert_eq!(p.at(0, 1), Cell::CurrentPlayer, "\n{:?}", p);
+        assert_eq!(p.at(0, 2), Cell::OtherPlayer, "\n{:?}", p);
+
+        let p = Position::from_str("111").unwrap();
+        assert_eq!(p.at(0, 0), Cell::OtherPlayer, "\n{:?}", p);
+        assert_eq!(p.at(1, 0), Cell::CurrentPlayer, "\n{:?}", p);
+        assert_eq!(p.at(2, 0), Cell::OtherPlayer, "\n{:?}", p);
+
+        // assert!(std::panic::catch_unwind(|| Position::from_str("a")).is_err());
+        // assert!(std::panic::catch_unwind(|| Position::from_str("7")).is_err());
+        // assert!(std::panic::catch_unwind(|| Position::from_str("00 0")).is_err());
     }
 }
