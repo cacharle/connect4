@@ -1,55 +1,54 @@
-use fnv::FnvHashMap; // better hashing function performance on small key (e.g u64)
+use bitfield_struct::bitfield;
 
 use crate::position::{Position, HEIGHT, WIDTH};
 
 const COLUMNS_ORDER: [u64; 7] = [3, 2, 4, 1, 5, 0, 6];
-
-type Cache = FnvHashMap<u64, i32>;
 
 pub struct Solver {
     pub visited: usize,
     cache: Cache,
 }
 
-const CACHE_SIZE: usize = 100_000_000;
+const CACHE_SIZE: usize = 1_000_000;
 
-// struct Cache(Vec<(u64, i32)>);
-//
-// impl Cache {
-//     pub fn new() -> Cache {
-//         Cache(vec![(0, 0); CACHE_SIZE])
-//     }
-//
-//     pub fn insert(&mut self, key: u64, value: i32) {
-//         let i = Cache::index(key);
-//         self.0[i].0 = key;
-//         self.0[i].1 = value;
-//     }
-//
-//     pub fn get(&self, key: u64) -> i32 {
-//         let i = Cache::index(key);
-//         return if self.0[i].0 == key {
-//             self.0[i].1
-//         } else {
-//             0
-//         }
-//     }
-//
-//     pub fn clear(&mut self) {
-//         self.0.fill((0, 0));
-//     }
-//
-//     fn index(key: u64) -> usize {
-//         (key % CACHE_SIZE as u64) as usize
-//     }
-// }
+#[bitfield(u64, default = true)]
+struct CacheEntry {
+    #[bits(56)]
+    key: u64,
+    #[bits(8)]
+    value: i32,
+}
+
+struct Cache(Vec<CacheEntry>);
+
+impl Cache {
+    pub fn new() -> Cache {
+        Cache(vec![Default::default(); CACHE_SIZE])
+    }
+
+    pub fn insert(&mut self, key: u64, value: i32) {
+        self.0[Cache::index(key)] = CacheEntry::new().with_key(key).with_value(value);
+    }
+
+    pub fn get(&self, key: u64) -> i32 {
+        let entry = &self.0[Cache::index(key)];
+        return if entry.key() == key { entry.value() } else { 0 };
+    }
+
+    pub fn clear(&mut self) {
+        self.0.fill(Default::default());
+    }
+
+    fn index(key: u64) -> usize {
+        (key % CACHE_SIZE as u64) as usize
+    }
+}
 
 impl Solver {
     pub fn new() -> Solver {
         Solver {
             visited: 0,
-            cache: Cache::with_capacity_and_hasher(CACHE_SIZE, Default::default()),
-            // cache: Cache::new(),
+            cache: Cache::new(),
         }
     }
 
@@ -122,9 +121,8 @@ impl Solver {
         //     }
         // }
 
-        // let max_score = self.cache.get(p.key());
-        // if max_score != 0 {
-        if let Some(&max_score) = self.cache.get(&p.key()) {
+        let max_score = self.cache.get(p.key());
+        if max_score != 0 {
             // can't return max_score directly
             // because the alpha-beta context in the cache may be
             // different than the current alpha-beta
@@ -136,7 +134,10 @@ impl Solver {
             }
         }
 
-        let mut plays: Vec<_> = COLUMNS_ORDER.iter().filter(|&&x| p.is_valid_play(x)).collect();
+        let mut plays: Vec<_> = COLUMNS_ORDER
+            .iter()
+            .filter(|&&x| p.is_valid_play(x))
+            .collect();
         // use insert sort instead (is there optimal instructions for a 8 size array?)
         plays.sort_by_key(|&&x| 100 - p.play(x).opponent().score());
         let mut best = alpha;
