@@ -137,14 +137,12 @@ impl Solver {
         }
 
         let mut plays: Vec<_> = COLUMNS_ORDER.iter().filter(|&&x| p.is_valid_play(x)).collect();
-        plays.sort_by_key(|&&x| 100 - p.play(x).score());
+        // use insert sort instead (is there optimal instructions for a 8 size array?)
+        plays.sort_by_key(|&&x| 100 - p.play(x).opponent().score());
         let mut best = alpha;
         for &x in plays {
             let played = p.play(x);
-            // println!("\n> {:064b}", non_losing_play_mask);
-            // println!("! {:064b}", played.player);
             if Position::column_mask(x) & non_losing_play_mask == 0 {
-                // println!("!!!!!!!!!!");
                 continue;
             }
             // using negamax, variante of minimax where:

@@ -55,7 +55,7 @@ impl Position {
         p
     }
 
-    fn opponent(&self) -> Position {
+    pub fn opponent(&self) -> Position {
         let mut p = self.clone();
         p.player = self.player ^ self.mask;
         p
