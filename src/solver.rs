@@ -9,12 +9,12 @@ pub struct Solver {
     cache: Cache,
 }
 
-const CACHE_SIZE: usize = 1_000_000;
+const CACHE_SIZE: usize = 9_500_000 / 8;  // L2 cache is 9.5MB
 
 #[bitfield(u64, default = true)]
 struct CacheEntry {
     #[bits(56)]
-    key: u64,
+    key: u64, // a position only needs 56bits to be represented
     #[bits(8)]
     value: i32,
 }
@@ -53,6 +53,8 @@ impl Solver {
     }
 
     pub fn solve(&mut self, p: Position) -> i32 {
+        // TODO: return directly if can win next move (otherwise solve_rec fails since it trims the
+        // winning move out)
         let mut min = -((WIDTH * HEIGHT - p.play_count) as i32) / 2;
         let mut max = (WIDTH * HEIGHT + 1 - p.play_count) as i32 / 2;
         // Iterative deepening
@@ -121,6 +123,15 @@ impl Solver {
         //     }
         // }
 
+        // This copy paste made a huge difference, hmmm
+        let min = -(((WIDTH*HEIGHT-2 - p.play_count)/2) as i32);	// lower bound of score as opponent cannot win next move
+        if alpha < min {
+          alpha = min;                     // there is no need to keep beta above our max possible score.
+          if alpha >= beta {
+              return alpha;
+            }// prune the exploration if the [alpha;beta] window is empty.
+        }
+
         let max_score = self.cache.get(p.key());
         if max_score != 0 {
             // can't return max_score directly
@@ -134,6 +145,7 @@ impl Solver {
             }
         }
 
+        // PERF: the allocation of a vector and the sorting still take a bit of time
         let mut plays: Vec<_> = COLUMNS_ORDER
             .iter()
             .filter(|&&x| p.is_valid_play(x))

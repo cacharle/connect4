@@ -8,3 +8,6 @@ edition = "2018"
 
 [dependencies]
 bitfield-struct = "0.5"
+
+[profile.release]
+debug = 1
