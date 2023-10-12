@@ -8,6 +8,7 @@ edition = "2018"
 
 [dependencies]
 bitfield-struct = "0.5"
+separator = "0.4.1"
 
 [profile.release]
 debug = 1

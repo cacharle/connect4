@@ -9,7 +9,7 @@ pub struct Solver {
     cache: Cache,
 }
 
-const CACHE_SIZE: usize = 9_500_000 / 8;  // L2 cache is 9.5MB
+const CACHE_SIZE: usize = 9_500_000 / 8; // L2 cache is 9.5MB
 
 #[bitfield(u64, default = true)]
 struct CacheEntry {
@@ -41,6 +41,39 @@ impl Cache {
 
     fn index(key: u64) -> usize {
         (key % CACHE_SIZE as u64) as usize
+    }
+}
+
+struct PlaySorter {
+    plays: [(u64, u64); 8],
+    size: usize,
+}
+
+impl PlaySorter {
+    fn new() -> PlaySorter {
+        PlaySorter {
+            plays: Default::default(),
+            size: 0,
+        }
+    }
+
+    fn insert(&mut self, play: u64, score: u64) {
+        assert!(self.size < self.plays.len());
+        let mut index = 0;
+        while self.plays[index].1 < score && index < self.size {
+            index += 1;
+        }
+        self.plays[index..].rotate_right(1);
+        self.plays[index] = (play, score);
+        self.size += 1;
+    }
+
+    fn pop(&mut self) -> Option<u64> {
+        if self.size == 0 {
+            return None;
+        }
+        self.size -= 1;
+        Some(self.plays[self.size].0)
     }
 }
 
@@ -124,12 +157,12 @@ impl Solver {
         // }
 
         // This copy paste made a huge difference, hmmm
-        let min = -(((WIDTH*HEIGHT-2 - p.play_count)/2) as i32);	// lower bound of score as opponent cannot win next move
+        let min = -(((WIDTH * HEIGHT - 2 - p.play_count) / 2) as i32); // lower bound of score as opponent cannot win next move
         if alpha < min {
-          alpha = min;                     // there is no need to keep beta above our max possible score.
-          if alpha >= beta {
-              return alpha;
-            }// prune the exploration if the [alpha;beta] window is empty.
+            alpha = min; // there is no need to keep beta above our max possible score.
+            if alpha >= beta {
+                return alpha;
+            } // prune the exploration if the [alpha;beta] window is empty.
         }
 
         let max_score = self.cache.get(p.key());
@@ -145,15 +178,13 @@ impl Solver {
             }
         }
 
-        // PERF: the allocation of a vector and the sorting still take a bit of time
-        let mut plays: Vec<_> = COLUMNS_ORDER
+        let mut sorter = PlaySorter::new();
+        COLUMNS_ORDER
             .iter()
             .filter(|&&x| p.is_valid_play(x))
-            .collect();
-        // use insert sort instead (is there optimal instructions for a 8 size array?)
-        plays.sort_by_key(|&&x| 100 - p.play(x).opponent().score());
+            .for_each(|&x| sorter.insert(x, p.play(x).opponent().score()));
         let mut best = alpha;
-        for &x in plays {
+        while let Some(x) = sorter.pop() {
             let played = p.play(x);
             if Position::column_mask(x) & non_losing_play_mask == 0 {
                 continue;
@@ -180,5 +211,21 @@ impl Solver {
     pub fn reset(&mut self) {
         self.visited = 0;
         self.cache.clear();
+    }
+}
+
+#[cfg(test)]
+mod play_sorter_test {
+    use super::*;
+    #[test]
+    fn test_insert_pop() {
+        let mut s = PlaySorter::new();
+        s.insert(1, 1);
+        s.insert(2, 30);
+        s.insert(3, 15);
+        assert_eq!(s.pop(), Some(2));
+        assert_eq!(s.pop(), Some(3));
+        assert_eq!(s.pop(), Some(1));
+        assert_eq!(s.pop(), None);
     }
 }

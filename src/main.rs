@@ -7,6 +7,7 @@ pub mod position;
 pub mod solver;
 
 use position::Position;
+use separator::Separatable;
 use solver::Solver;
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -29,8 +30,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         let score = solver.solve(pos);
         let elapsed = begin.elapsed();
         println!(
-            "{:03}: score: {:3}, time: {:>8.2?}, visited {:>5}",
-            total_solve, score, elapsed, solver.visited
+            "{:03}: score: {:3}, time: {:>8.2?}, visited {:>10}",
+            total_solve,
+            score,
+            elapsed,
+            solver.visited.separated_string()
         );
         if score != expected_score {
             eprintln!(
@@ -45,9 +49,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         solver.reset();
     }
     println!(
-        "mean time: {:?} | mean visited {}",
+        "mean time: {:?} | mean visited {:10}",
         total_time / total_solve,
-        total_visited / total_solve as usize
+        (total_visited / total_solve as usize).separated_string()
     );
     Ok(())
 }
