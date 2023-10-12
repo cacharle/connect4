@@ -1,6 +1,7 @@
 use std::error::Error;
 use std::io;
 use std::io::prelude::*;
+use std::str::FromStr;
 use std::time::{Duration, Instant};
 
 pub mod position;
@@ -15,6 +16,19 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut total_solve = 0;
     let mut total_visited = 0;
     let mut solver = Solver::new();
+
+    // let mut position = Position::from_str("1212")?;
+    // println!("{position:?}");
+    // for result in io::stdin().lock().lines() {
+    //     let line = result?;
+    //     let col = line.chars().take(1).next().unwrap().to_digit(10).unwrap();
+    //     position = position.play(col.into());
+    //     println!("AI is thinking..");
+    //     let ai_col = solver.best_play(position.clone());
+    //     println!("AI is done thinking and played {ai_col}");
+    //     position = position.play(ai_col.into());
+    //     println!("{:?}", position.clone());
+    // }
 
     for result in io::stdin().lock().lines() {
         let line = result?;
@@ -53,5 +67,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         total_time / total_solve,
         (total_visited / total_solve as usize).separated_string()
     );
+
     Ok(())
 }

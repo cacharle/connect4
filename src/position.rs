@@ -65,19 +65,24 @@ impl Position {
         self.mask & Self::top_mask(col_pos) == 0
     }
 
-    pub fn is_winning_play(&self, col_pos: u64) -> bool {
-        // the current player stones with the play
-        // mask + bottom_mask = add a stone in column
-        // & column_mask: only modify the current player stone
-        // (ignoring other player in other columns)
-        let p =
-            self.player | ((self.mask + Self::bottom_mask(col_pos)) & Self::column_mask(col_pos));
+    // pub fn is_winning_play(&self, col_pos: u64) -> bool {
+    //     // the current player stones with the play
+    //     // mask + bottom_mask = add a stone in column
+    //     // & column_mask: only modify the current player stone
+    //     // (ignoring other player in other columns)
+    //     let p =
+    //         self.player | ((self.mask + Self::bottom_mask(col_pos)) & Self::column_mask(col_pos));
+    //     let mut p2 = Position::new();
+    //     self.is_winning
+    // }
+    //
 
+    pub fn is_winning(&self) -> bool {
+        let p = self.player;
         // shift the board in different direction,
         // if the shifed boards have at least 1 stone in common
         // it means that the original has 4 stone aligned.
         // possible optimization with tmp variable to make 2 shifts instead of 4
-
         // vertical
         if (p >> 0) & (p >> 1) & (p >> 2) & (p >> 3) != 0 {
             return true;
@@ -117,7 +122,7 @@ impl Position {
         // becomes
         // . # # . . . .
         // # . . # # # #
-        let mut possible_mask = (self.mask + FULL_BOTTOM_MASK) & FULL_BOARD_MASK;
+        let mut possible_mask = self.possible_mask();
         let opponent_win_mask = self.opponent().winning_mask();
         // we HAVE to play where the opponent has a winning play
         let forced_moves = possible_mask & opponent_win_mask;
@@ -131,6 +136,14 @@ impl Position {
         }
         // Remove moves that are directly bellow an opponent winning space
         return possible_mask & !(opponent_win_mask >> 1);
+    }
+
+    pub fn can_win_next(&self) -> bool {
+        self.possible_mask() & self.winning_mask() != 0
+    }
+
+    fn possible_mask(&self) -> u64 {
+        (self.mask + FULL_BOTTOM_MASK) & FULL_BOARD_MASK
     }
 
     // Mask of direct winning moves in this position

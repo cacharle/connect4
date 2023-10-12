@@ -19,24 +19,27 @@ struct CacheEntry {
     value: i32,
 }
 
-struct Cache(Vec<CacheEntry>);
+use std::sync::RwLock;
+
+struct Cache(RwLock<Vec<CacheEntry>>);
 
 impl Cache {
     pub fn new() -> Cache {
-        Cache(vec![Default::default(); CACHE_SIZE])
+        Cache(RwLock::new(vec![Default::default(); CACHE_SIZE]))
     }
 
     pub fn insert(&mut self, key: u64, value: i32) {
-        self.0[Cache::index(key)] = CacheEntry::new().with_key(key).with_value(value);
+        self.0.write().unwrap()[Cache::index(key)] =
+            CacheEntry::new().with_key(key).with_value(value);
     }
 
     pub fn get(&self, key: u64) -> i32 {
-        let entry = &self.0[Cache::index(key)];
+        let entry = &self.0.read().unwrap()[Cache::index(key)];
         return if entry.key() == key { entry.value() } else { 0 };
     }
 
     pub fn clear(&mut self) {
-        self.0.fill(Default::default());
+        self.0.write().unwrap().fill(Default::default());
     }
 
     fn index(key: u64) -> usize {
@@ -77,6 +80,8 @@ impl PlaySorter {
     }
 }
 
+use std::sync::{mpsc, Arc};
+
 impl Solver {
     pub fn new() -> Solver {
         Solver {
@@ -85,7 +90,32 @@ impl Solver {
         }
     }
 
+    pub fn best_play(&mut self, p: Position) -> u64 {
+        let (tx, rx) = mpsc::channel();
+        // let self_rc = Arc::new(self);
+        for &c in COLUMNS_ORDER.iter().rev() {
+            let played = p.play(c).opponent();
+            let tx = tx.clone();
+            // TODO: pass the cache as an argument wrapped in Arc<RwLock<Cache>>
+            // let self_rc = self_rc.clone();
+            // std::thread::spawn(move || {
+            let s = self.solve(played);
+            tx.send((c, s)).unwrap();
+            println!("col: {c}, score: {s}");
+            // });
+        }
+        drop(tx);
+        rx.iter().max_by_key(|&(_, score)| score).unwrap().0
+    }
+
     pub fn solve(&mut self, p: Position) -> i32 {
+        if p.is_winning() {
+            // 1+ to add more weight compared to can_win_next
+            return 1 + ((WIDTH * HEIGHT + 1 - p.play_count) / 2) as i32;
+        }
+        if p.can_win_next() {
+            return ((WIDTH * HEIGHT + 1 - p.play_count) / 2) as i32;
+        }
         // TODO: return directly if can win next move (otherwise solve_rec fails since it trims the
         // winning move out)
         let mut min = -((WIDTH * HEIGHT - p.play_count) as i32) / 2;
@@ -139,6 +169,8 @@ impl Solver {
     }
 
     fn solve_rec(&mut self, p: Position, mut alpha: i32, mut beta: i32) -> i32 {
+        debug_assert!(alpha < beta);
+        debug_assert!(!p.can_win_next());
         self.visited += 1;
 
         let non_losing_play_mask = p.possible_non_losing_play_mask();
@@ -150,11 +182,6 @@ impl Solver {
         if p.is_draw() {
             return 0;
         }
-        // for x in 0..WIDTH {
-        //     if p.is_valid_play(x) && p.is_winning_play(x) {
-        //         return (((WIDTH * HEIGHT + 1) as i32) - (p.play_count as i32)) / 2;
-        //     }
-        // }
 
         // This copy paste made a huge difference, hmmm
         let min = -(((WIDTH * HEIGHT - 2 - p.play_count) / 2) as i32); // lower bound of score as opponent cannot win next move
